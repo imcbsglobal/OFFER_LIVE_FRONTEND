@@ -182,6 +182,59 @@
   }
 }
 
+// ─── Alert Messages ───────────────────────────────────────
+.alert-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: fadeIn 0.35s ease;
+
+  .alert-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 1px;
+  }
+
+  .alert-text {
+    flex: 1;
+  }
+
+  &.alert-error {
+    background: linear-gradient(135deg, #fff5f3 0%, #fff0ee 100%);
+    color: #c0392b;
+    border: 1.5px solid #f5c6c6;
+    box-shadow: 0 2px 14px rgba(192, 57, 43, 0.1);
+
+    .alert-icon svg {
+      stroke: #e74c3c;
+    }
+  }
+
+  &.alert-success {
+    background: linear-gradient(135deg, #f0fff7 0%, #f0fff4 100%);
+    color: #1e8449;
+    border: 1.5px solid #b7e4c7;
+    box-shadow: 0 2px 14px rgba(30, 132, 73, 0.1);
+
+    .alert-icon svg {
+      stroke: #27ae60;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// ─── Login Form ───────────────────────────────────────────
 .login-form {
   .form-group {
     margin-bottom: 24px;
@@ -206,9 +259,13 @@
       left: 16px;
       color: #aaa;
       font-size: 18px;
+      z-index: 1;
     }
 
-    input {
+    input[type="email"],
+    input[type="password"],
+    input[type="text"],
+    input[type="tel"] {
       width: 100%;
       padding: 14px 16px 14px 45px;
       border: 2px solid #e0e0e0;
@@ -216,6 +273,7 @@
       font-size: 15px;
       transition: all 0.3s ease;
       outline: none;
+      background: white;
 
       &:focus {
         border-color: #ff6b35;
@@ -224,6 +282,11 @@
 
       &::placeholder {
         color: #ccc;
+      }
+
+      &:disabled {
+        background: #f9f9f9;
+        cursor: not-allowed;
       }
     }
   }
@@ -280,23 +343,186 @@
     transition: all 0.3s ease;
     box-shadow: 0 6px 20px rgba(255, 107, 53, 0.3);
 
-    &:hover {
+    &:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
     }
 
-    &:active {
+    &:active:not(:disabled) {
       transform: translateY(0);
     }
 
     &:disabled {
-      opacity: 0.6;
+      opacity: 0.55;
       cursor: not-allowed;
       transform: none;
     }
   }
 }
 
+// ─── Toggle Password Button ───────────────────────────────
+.toggle-password-btn,
+.password-toggle {
+  position: absolute;
+  right: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+// ─── Phone Input ──────────────────────────────────────────
+.phone-input-wrapper {
+  input[type="tel"] {
+    padding-left: 90px !important;
+  }
+}
+
+.country-code {
+  position: absolute;
+  left: 45px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #444;
+  border-right: 1.5px solid #ddd;
+  padding-right: 10px;
+  user-select: none;
+  z-index: 1;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  padding-left: 4px;
+  font-size: 12px;
+  color: #999;
+}
+
+// ─── OTP Phone Display ────────────────────────────────────
+.otp-phone-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff7f4;
+  border: 1.5px solid #ffd5c4;
+  border-radius: 16px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #444;
+
+  strong {
+    color: #ff6b35;
+  }
+}
+
+.change-number-btn {
+  background: none;
+  border: none;
+  color: #ff6b35;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #e05a28;
+  }
+}
+
+// ─── OTP Boxes ────────────────────────────────────────────
+.otp-inputs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.otp-box {
+  width: 48px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  border: 2px solid #e0e0e0;
+  border-radius: 14px;
+  outline: none;
+  transition: all 0.25s ease;
+  color: #333;
+  background: white;
+  caret-color: #ff6b35;
+  padding: 0;
+
+  &:focus {
+    border-color: #ff6b35;
+    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.12);
+    background: #fff9f7;
+  }
+
+  &.otp-box--filled {
+    border-color: #ff8c42;
+    background: #fff4ef;
+    color: #ff6b35;
+  }
+
+  &:disabled {
+    background: #f9f9f9;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Resend Row ───────────────────────────────────────────
+.otp-resend-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  margin-top: -8px;
+  font-size: 13px;
+}
+
+.otp-timer {
+  color: #999;
+
+  strong {
+    color: #ff6b35;
+  }
+}
+
+.resend-btn {
+  background: none;
+  border: none;
+  color: #ff6b35;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #e05a28;
+  }
+
+  &:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Footer ───────────────────────────────────────────────
 .login-footer {
   text-align: center;
   margin-top: 24px;
@@ -318,6 +544,7 @@
   }
 }
 
+// ─── Responsive ───────────────────────────────────────────
 @media (max-width: 768px) {
   .login-card {
     flex-direction: column;
@@ -342,6 +569,12 @@
       font-size: 28px;
     }
   }
+
+  .otp-box {
+    width: 42px;
+    height: 48px;
+    font-size: 20px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -352,101 +585,43 @@
   .login-header h1 {
     font-size: 26px;
   }
-}
-// ─── OTP-specific styles ───────────────────────────────────────
 
-.error-message {
-  background: #fee;
-  color: #c33;
-  padding: 12px 16px;
-  border-radius: 20px;
-  margin-bottom: 20px;
-  font-size: 14px;
-  border: 1px solid #fcc;
-}
+  .otp-inputs {
+    gap: 7px;
+  }
 
-.password-toggle {
-  position: absolute;
-  right: 16px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  padding: 5px;
-  line-height: 1;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .otp-box {
+    width: 38px;
+    height: 44px;
+    font-size: 18px;
+    border-radius: 10px;
   }
 }
 
-// Phone input: disabled state when OTP already sent
-input:disabled {
-  background: #f5f5f5;
+// ─── Phone input styles ────────────────────────────────────
+
+.phone-input-wrapper {
+  input {
+    padding-left: 90px !important;
+  }
+}
+
+.country-code {
+  position: absolute;
+  left: 45px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #444;
+  border-right: 1.5px solid #ddd;
+  padding-right: 10px;
+  user-select: none;
+  z-index: 1;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 6px;
+  padding-left: 4px;
+  font-size: 12px;
   color: #999;
-  cursor: not-allowed;
-}
-
-// "Change" button inside phone input wrapper
-.change-phone-btn {
-  position: absolute;
-  right: 14px;
-  background: none;
-  border: none;
-  color: #ff6b35;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 12px;
-  transition: background 0.2s;
-
-  &:hover {
-    background: rgba(255, 107, 53, 0.08);
-  }
-}
-
-// OTP input — spaced digits feel
-.otp-input {
-  letter-spacing: 0.35em;
-  font-weight: 700;
-  font-size: 18px !important;
-  text-align: center;
-}
-
-// Resend / timer row
-.otp-hint {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #888;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  strong {
-    color: #ff6b35;
-  }
-}
-
-// Resend OTP text button
-.resend-btn {
-  background: none;
-  border: none;
-  color: #ff6b35;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-  transition: color 0.2s;
-
-  &:hover {
-    color: #ff8c42;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 }

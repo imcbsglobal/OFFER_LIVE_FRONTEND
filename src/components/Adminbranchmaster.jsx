@@ -29,6 +29,8 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
+
+
   useEffect(() => {
     if (userData && userData.username) {
       setAdminName(userData.username);
@@ -39,8 +41,73 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
         setAdminName(parsedUser.username || parsedUser.email || 'Admin');
       }
     }
+    // Load data immediately for instant display
     fetchBranches();
     fetchMiselShops();
+    // Silently sync Misel shops → then auto-create any missing branches in background
+    const token = localStorage.getItem('access_token');
+    const autoCreateBranches = async () => {
+      try {
+        // 1. Sync Misel users into Django first
+        await fetch(`${API_BASE_URL}/misel-sync/`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+
+        // 2. Fetch latest Misel shops
+        const miselRes = await fetch('https://vsaverapi.imcbs.com/api/misel/');
+        if (!miselRes.ok) return;
+        const miselData = await miselRes.json();
+        const shops = Array.isArray(miselData) ? miselData : (miselData.results || []);
+
+        // 3. Fetch latest branches from Django
+        const branchRes = await fetch(`${API_BASE_URL}/branch-master/`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!branchRes.ok) return;
+        const existingBranches = await branchRes.json();
+        const existingCodes = new Set(existingBranches.map(b => String(b.branch_code)));
+
+        // 4. Create a branch for every shop that doesn't have one yet
+        let anyCreated = false;
+        for (const shop of shops) {
+          const code = String(shop.id);
+          if (existingCodes.has(code)) continue;
+
+          const payload = new FormData();
+          payload.append('user', shop.id);
+          payload.append('branch_name', shop.address1 || shop.firm_name);
+          payload.append('branch_code', code);
+          payload.append('location', shop.address1 || '');
+          payload.append('address', shop.address1 || '');
+          payload.append('status', 'active');
+
+          const res = await fetch(`${API_BASE_URL}/branch-master/`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: payload,
+          });
+          if (res.ok) {
+            existingCodes.add(code);
+            anyCreated = true;
+          }
+        }
+
+        // 5. If new branches were created, refresh the table silently
+        if (anyCreated) {
+          const refreshRes = await fetch(`${API_BASE_URL}/branch-master/`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+          if (refreshRes.ok) {
+            const updated = await refreshRes.json();
+            setBranches(updated);
+          }
+        }
+      } catch (err) {
+        console.error('Background branch auto-sync failed:', err);
+      }
+    };
+    autoCreateBranches();
   }, [userData]);
 
   const handleToggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
@@ -57,13 +124,14 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
     }
   }, [error, successMessage]);
 
+  // ── FIX 1: Misel API returns plain array [], not { results: [] } ──
   const fetchMiselShops = async () => {
     setMiselLoading(true);
     try {
       const response = await fetch('https://vsaverapi.imcbs.com/api/misel/');
       if (!response.ok) { console.error('Failed to fetch Misel shops'); return; }
       const data = await response.json();
-      setMiselShops(data.results || []);
+      setMiselShops(Array.isArray(data) ? data : (data.results || []));
     } catch (err) {
       console.error('Error fetching Misel shops:', err);
     } finally {
@@ -89,6 +157,8 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
       setLoading(false);
     }
   };
+
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -220,6 +290,19 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
     inactive: branches.filter(b => b.status === 'inactive').length,
   };
 
+  // ── Helper: find the synced Django User ID for a Misel shop ──
+  // After sync, backend creates a user with username = "misel_<id>"
+  // We look up that user in the branches list (user_info) or fall back to shop.id
+  const resolveUserId = (shop) => {
+    // Try to find a branch already linked to this misel shop by matching shop_name
+    const linked = branches.find(
+      b => b.user_info?.shop_name === shop.firm_name
+    );
+    if (linked?.user_info?.id) return linked.user_info.id;
+    // Fallback: use the Misel ID (sync must be run first for proper linking)
+    return shop.id;
+  };
+
   return (
     <div className="admin-branch-master-container">
       <AdminSidebar
@@ -237,9 +320,6 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
             <div className="header-left">
               <h1 className="page-title">Branch Master</h1>
               <p className="page-subtitle">Manage all branch locations</p>
-            </div>
-            <div className="header-right">
-
             </div>
           </div>
 
@@ -300,7 +380,8 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                         userSearch !== ''
                           ? userSearch
                           : formData.user
-                            ? (miselShops.find(s => String(s.id) === String(formData.user))?.firm_name || '')
+                            ? (miselShops.find(s => String(s.id) === String(formData.user))?.firm_name ||
+                               miselShops.find(s => resolveUserId(s) === formData.user)?.firm_name || '')
                             : ''
                       }
                       onChange={e => {
@@ -314,6 +395,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                       style={{ width: '100%' }}
                     />
                     <input type="hidden" name="user" value={formData.user} />
+
                     {showUserDropdown && miselShops.length > 0 && (
                       <div style={{
                         position: 'absolute', top: '100%', left: 0, right: 0,
@@ -327,25 +409,30 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                             <div
                               key={shop.id}
                               onMouseDown={() => {
+                                const resolvedUserId = resolveUserId(shop);
+                                // ── FIX 2 & 3: use firm_name for branch_name, correct user ID ──
                                 setFormData(prev => ({
                                   ...prev,
-                                  user: shop.id,
-                                  branch_name: shop.address1,
+                                  user:        resolvedUserId,
+                                  branch_name: shop.address1 || shop.firm_name, // ✅ address1 is the branch name
                                   branch_code: String(shop.id),
-                                  location: shop.address1 || '',
-                                  address: shop.address1 || '',
+                                  location:    shop.address1 || '',
+                                  address:     shop.address1 || '',
                                 }));
                                 setUserSearch('');
                                 setShowUserDropdown(false);
                               }}
                               style={{
                                 padding: '10px 14px', cursor: 'pointer',
-                                background: String(formData.user) === String(shop.id) ? '#f0f4ff' : '#fff',
+                                background: String(formData.user) === String(resolveUserId(shop)) ? '#f0f4ff' : '#fff',
                                 borderBottom: '1px solid #f2f4f7',
                                 display: 'flex', flexDirection: 'column', gap: 2
                               }}
                               onMouseEnter={e => e.currentTarget.style.background = '#f7f8ff'}
-                              onMouseLeave={e => e.currentTarget.style.background = String(formData.user) === String(shop.id) ? '#f0f4ff' : '#fff'}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background =
+                                  String(formData.user) === String(resolveUserId(shop)) ? '#f0f4ff' : '#fff';
+                              }}
                             >
                               <span style={{ fontWeight: 600, fontSize: 13, color: '#1d2939' }}>
                                 🏪 {shop.firm_name}
@@ -355,29 +442,51 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                               )}
                             </div>
                           ))}
-                        {miselShops.filter(s => !userSearch || s.firm_name.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
-                          <div style={{ padding: '12px 14px', color: '#667085', fontSize: 13 }}>No shops match your search.</div>
+                        {miselShops.filter(s =>
+                          !userSearch || s.firm_name.toLowerCase().includes(userSearch.toLowerCase())
+                        ).length === 0 && (
+                          <div style={{ padding: '12px 14px', color: '#667085', fontSize: 13 }}>
+                            No shops match your search.
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
+
                   {formData.user && (
                     <div style={{ marginTop: 4, fontSize: 12, color: '#12b76a', fontWeight: 500 }}>
-                      ✅ {miselShops.find(s => String(s.id) === String(formData.user))?.firm_name}
+                      ✅ {
+                        miselShops.find(s => String(resolveUserId(s)) === String(formData.user))?.firm_name ||
+                        miselShops.find(s => String(s.id) === String(formData.user))?.firm_name ||
+                        `User ID: ${formData.user}`
+                      }
                     </div>
                   )}
                 </div>
+
                 <div className="form-group">
                   <label>Branch Name *</label>
-                  <input type="text" name="branch_name" value={formData.branch_name} onChange={handleInputChange} placeholder="e.g., Main Branch" required disabled={loading}/>
+                  <input
+                    type="text" name="branch_name" value={formData.branch_name}
+                    onChange={handleInputChange} placeholder="e.g., Main Branch"
+                    required disabled={loading}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Branch Code *</label>
-                  <input type="text" name="branch_code" value={formData.branch_code} onChange={handleInputChange} placeholder="e.g., BR001" required disabled={loading}/>
+                  <input
+                    type="text" name="branch_code" value={formData.branch_code}
+                    onChange={handleInputChange} placeholder="e.g., BR001"
+                    required disabled={loading}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Location *</label>
-                  <input type="text" name="location" value={formData.location} onChange={handleInputChange} placeholder="e.g., Downtown" required disabled={loading}/>
+                  <input
+                    type="text" name="location" value={formData.location}
+                    onChange={handleInputChange} placeholder="e.g., Downtown"
+                    required disabled={loading}
+                  />
                 </div>
               </div>
 
@@ -394,17 +503,19 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
               <div className="form-row">
                 <div className="form-group full-width">
                   <label>Address</label>
-                  <input type="text" name="address" value={formData.address} onChange={handleInputChange} placeholder="Street address" disabled={loading}/>
+                  <input
+                    type="text" name="address" value={formData.address}
+                    onChange={handleInputChange} placeholder="Street address"
+                    disabled={loading}
+                  />
                 </div>
               </div>
 
-
-
-
-
               <div className="form-actions">
                 {isEditing && (
-                  <button type="button" className="btn-cancel" onClick={handleCancel} disabled={loading}>Cancel</button>
+                  <button type="button" className="btn-cancel" onClick={handleCancel} disabled={loading}>
+                    Cancel
+                  </button>
                 )}
                 <button type="submit" className="btn-submit" disabled={loading}>
                   {loading ? 'Saving...' : (isEditing ? 'Update Branch' : 'Create Branch')}
@@ -424,7 +535,10 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
-                  <input type="text" placeholder="Search branches…" value={searchQuery} onChange={handleSearchChange}/>
+                  <input
+                    type="text" placeholder="Search branches…"
+                    value={searchQuery} onChange={handleSearchChange}
+                  />
                 </div>
               </div>
             </div>
@@ -489,14 +603,18 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
 
                           <td>
                             <div className="contact-cell">
-                              {branch.address ? <span>{branch.address}</span> : <span style={{ color: '#97a0af' }}>—</span>}
+                              {branch.address
+                                ? <span>{branch.address}</span>
+                                : <span style={{ color: '#97a0af' }}>—</span>}
                               {branch.pincode && <span className="contact-email">{branch.pincode}</span>}
                             </div>
                           </td>
 
                           <td>
                             <div className="contact-cell">
-                              {branch.contact_number ? <span>{branch.contact_number}</span> : <span style={{ color: '#97a0af' }}>—</span>}
+                              {branch.contact_number
+                                ? <span>{branch.contact_number}</span>
+                                : <span style={{ color: '#97a0af' }}>—</span>}
                               {branch.email && <span className="contact-email">{branch.email}</span>}
                             </div>
                           </td>
@@ -517,13 +635,23 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
 
                           <td>
                             <div className="table-actions">
-                              <button className="tbl-btn-edit" onClick={() => handleEdit(branch)} disabled={loading} title="Edit Branch">
+                              <button
+                                className="tbl-btn-edit"
+                                onClick={() => handleEdit(branch)}
+                                disabled={loading}
+                                title="Edit Branch"
+                              >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                 </svg>
                               </button>
-                              <button className="tbl-btn-delete" onClick={() => handleDelete(branch.id)} disabled={loading} title="Delete Branch">
+                              <button
+                                className="tbl-btn-delete"
+                                onClick={() => handleDelete(branch.id)}
+                                disabled={loading}
+                                title="Delete Branch"
+                              >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <polyline points="3 6 5 6 21 6"/>
                                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>

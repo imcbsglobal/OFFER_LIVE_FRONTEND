@@ -12,11 +12,8 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
   const [adminForm, setAdminForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
 
-  // User OTP state
+  // User state
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpTimer, setOtpTimer] = useState(0);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,22 +33,10 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
     return { error: "Non-JSON response from server.", _raw: text };
   };
 
-  const startResendTimer = () => {
-    setOtpTimer(60);
-    const interval = setInterval(() => {
-      setOtpTimer((prev) => {
-        if (prev <= 1) { clearInterval(interval); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
   const switchTab = (toAdmin) => {
     setIsAdmin(toAdmin);
     setError("");
-    setOtpSent(false);
     setPhone("");
-    setOtp("");
     setAdminForm({ email: "", password: "" });
   };
 
@@ -98,63 +83,24 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
     }
   };
 
-  // ─── User: Step 1 — Send OTP ─────────────────────────────
+  // ─── User Login (phone → debtors API check) ───────────────
 
-  const handleSendOtp = async (e) => {
-    e?.preventDefault();
-    setError("");
-
-    if (!phone.trim()) {
-      setError("Please enter your mobile number.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/user/send-otp/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: phone.trim() }),
-      });
-
-      const data = await safeParseResponse(response);
-
-      if (response.ok) {
-        setOtpSent(true);
-        setOtp("");
-        startResendTimer();
-        // DEV ONLY — remove in production
-        if (data.otp) console.log("DEV OTP:", data.otp);
-      } else {
-        const msg =
-          data?.phone_number?.[0] || data?.error || "Failed to send OTP. Please try again.";
-        setError(msg);
-      }
-    } catch (err) {
-      console.error("Send OTP error:", err);
-      setError("Request failed. Check backend URL / CORS / server logs.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // ─── User: Step 2 — Verify OTP ───────────────────────────
-
-  const handleVerifyOtp = async (e) => {
+  const handleUserSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!otp.trim() || otp.length !== 6) {
-      setError("Please enter the 6-digit OTP.");
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length < 10) {
+      setError("Please enter a valid 10-digit mobile number.");
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/user/verify-otp/`, {
+      const response = await fetch(`${API_BASE_URL}/user/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: phone.trim(), otp: otp.trim() }),
+        body: JSON.stringify({ phone_number: cleaned }),
       });
 
       const data = await safeParseResponse(response);
@@ -163,18 +109,23 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
         localStorage.setItem("access_token", data.access);
         localStorage.setItem("refresh_token", data.refresh);
         setAuthToken(data.access);
-        const userData = { ...data.user, is_admin: false };
+        const userData = { 
+          ...data.user, 
+          is_admin: false,
+          debtor_name: data.debtor_name || '',
+          debtor_code: data.debtor_code || '',
+          place: data.place || '',
+        };
         localStorage.setItem("user", JSON.stringify(userData));
         onUserLogin(userData);
         navigate("/user-dashboard");
         return;
       }
 
-      const msg =
-        data?.error || data?.non_field_errors?.[0] || "OTP verification failed. Please try again.";
-      setError(msg);
+      setError((() => { const msg = data?.error || "Login failed. Please check your number."; if (msg.toLowerCase().includes("not registered")) return "This number isn't linked to any account. Please check and try again."; return msg.replace(/\.?\s*Please contact.*?(admin|us)\.?/gi, "").trim(); })());
+      if (data?._raw) console.error("Raw server response:", data._raw);
     } catch (err) {
-      console.error("Verify OTP error:", err);
+      console.error("User login error:", err);
       setError("Request failed. Check backend URL / CORS / server logs.");
     } finally {
       setIsLoading(false);
@@ -228,7 +179,18 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
           </div>
 
           {/* Error */}
-          {error && <div className="error-message">{error}</div>}
+          {error && (
+            <div className="alert-message alert-error">
+              <span className="alert-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </span>
+              <span className="alert-text">{error}</span>
+            </div>
+          )}
 
           {/* ── ADMIN: email + password ── */}
           {isAdmin && (
@@ -241,7 +203,7 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
                     type="email"
                     id="email"
                     value={adminForm.email}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, email: e.target.value }))}
+                    onChange={(e) => { setAdminForm((p) => ({ ...p, email: e.target.value })); if (error) setError(""); }}
                     placeholder="Enter your email"
                     required
                     disabled={isLoading}
@@ -257,7 +219,7 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
                     type={showPassword ? "text" : "password"}
                     id="password"
                     value={adminForm.password}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, password: e.target.value }))}
+                    onChange={(e) => { setAdminForm((p) => ({ ...p, password: e.target.value })); if (error) setError(""); }}
                     placeholder="Enter your password"
                     required
                     disabled={isLoading}
@@ -279,7 +241,7 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
                   <input type="checkbox" />
                   <span>Remember me</span>
                 </label>
-                <a href="#" className="forgot-password">Forgot Password?</a>
+                {/* <a href="#" className="forgot-password">Forgot Password?</a> */}
               </div>
 
               <button type="submit" className="login-btn" disabled={isLoading}>
@@ -288,88 +250,45 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
             </form>
           )}
 
-          {/* ── USER: phone + OTP ── */}
+          {/* ── USER: phone number only ── */}
           {!isAdmin && (
-            <form
-              className="login-form"
-              onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}
-            >
-              {/* Step 1: Phone number */}
+            <form className="login-form" onSubmit={handleUserSubmit}>
               <div className="form-group">
                 <label htmlFor="phone">Mobile Number</label>
-                <div className="input-wrapper">
+                <div className="input-wrapper phone-input-wrapper">
                   <span className="input-icon">📱</span>
+                  <span className="country-code">+91</span>
                   <input
                     type="tel"
                     id="phone"
                     value={phone}
-                    onChange={(e) => { setPhone(e.target.value); if (error) setError(""); }}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPhone(val);
+                      if (error) setError("");
+                    }}
                     placeholder="Enter your mobile number"
                     required
-                    disabled={isLoading || otpSent}
+                    disabled={isLoading}
+                    maxLength={10}
+                    inputMode="numeric"
                   />
-                  {otpSent && (
-                    <button
-                      type="button"
-                      className="change-phone-btn"
-                      onClick={() => { setOtpSent(false); setOtp(""); setError(""); }}
-                    >
-                      Change
-                    </button>
-                  )}
                 </div>
+                <span className="field-hint">Enter the number registered with your account</span>
               </div>
 
-              {/* Step 2: OTP input (shown after send) */}
-              {otpSent && (
-                <div className="form-group">
-                  <label htmlFor="otp">Enter OTP</label>
-                  <div className="input-wrapper">
-                    <span className="input-icon">🔑</span>
-                    <input
-                      type="text"
-                      id="otp"
-                      value={otp}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                        setOtp(val);
-                        if (error) setError("");
-                      }}
-                      placeholder="6-digit OTP"
-                      maxLength={6}
-                      inputMode="numeric"
-                      required
-                      disabled={isLoading}
-                      className="otp-input"
-                    />
-                  </div>
-                  <div className="otp-hint">
-                    {otpTimer > 0 ? (
-                      <span>Resend OTP in <strong>{otpTimer}s</strong></span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="resend-btn"
-                        onClick={handleSendOtp}
-                        disabled={isLoading}
-                      >
-                        Resend OTP
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <button type="submit" className="login-btn" disabled={isLoading}>
-                {isLoading
-                  ? otpSent ? "Verifying..." : "Sending OTP..."
-                  : otpSent ? "Verify & Sign In" : "Send OTP"}
+              <button
+                type="submit"
+                className="login-btn"
+                disabled={isLoading || phone.replace(/\D/g, "").length < 10}
+              >
+                {isLoading ? "Verifying..." : "Login"}
               </button>
             </form>
           )}
 
           <div className="login-footer">
-            <p>Don't have an account? <a href="#">Sign up</a></p>
+            {/* <p>Don't have an account? <a href="#">Contact Admin</a></p> */}
           </div>
         </div>
       </div>
