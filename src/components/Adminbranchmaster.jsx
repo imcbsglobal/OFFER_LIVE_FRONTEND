@@ -11,6 +11,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
   const [branches, setBranches] = useState([]);
   const [miselShops, setMiselShops] = useState([]);
   const [miselLoading, setMiselLoading] = useState(false);
+  const [djangoUsers, setDjangoUsers] = useState([]); // ✅ FIX: Django user list for ID resolution
   const [userSearch, setUserSearch] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,6 +45,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
     // Load data immediately for instant display
     fetchBranches();
     fetchMiselShops();
+    fetchDjangoUsers(); // ✅ FIX: load Django users for proper ID resolution
     // Silently sync Misel shops → then auto-create any missing branches in background
     const token = localStorage.getItem('access_token');
     const autoCreateBranches = async () => {
@@ -70,14 +72,32 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
 
         // 4. Create a branch for every shop that doesn't have one yet
         let anyCreated = false;
+
+        // Fetch Django users for proper ID resolution
+        const usersRes = await fetch(`${API_BASE_URL}/users/dropdown/`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        const usersData = usersRes.ok ? await usersRes.json() : [];
+        const djangoUsersList = Array.isArray(usersData) ? usersData : (usersData.results || []);
+
         for (const shop of shops) {
-          const code = String(shop.id);
-          if (existingCodes.has(code)) continue;
+          const branchCode = shop.client_id ? String(shop.client_id) : String(shop.id);
+          if (existingCodes.has(branchCode)) continue;
+
+          // Resolve Django user PK — never use raw shop.id as the user FK
+          const djangoUser =
+            djangoUsersList.find(u => u.username === (shop.client_id ? `misel_${shop.client_id}` : `misel_${shop.id}`)) ||
+            djangoUsersList.find(u => u.shop_name === shop.firm_name);
+
+          if (!djangoUser) {
+            console.warn(`No Django user found for Misel shop ${shop.firm_name} (id=${shop.id}), skipping auto-create`);
+            continue;
+          }
 
           const payload = new FormData();
-          payload.append('user', shop.id);
+          payload.append('user', djangoUser.id);
           payload.append('branch_name', shop.address1 || shop.firm_name);
-          payload.append('branch_code', code);
+          payload.append('branch_code', branchCode);
           payload.append('location', shop.address1 || '');
           payload.append('address', shop.address1 || '');
           payload.append('status', 'active');
@@ -88,7 +108,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
             body: payload,
           });
           if (res.ok) {
-            existingCodes.add(code);
+            existingCodes.add(branchCode);
             anyCreated = true;
           }
         }
@@ -136,6 +156,21 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
       console.error('Error fetching Misel shops:', err);
     } finally {
       setMiselLoading(false);
+    }
+  };
+
+  // ✅ FIX: Fetch actual Django users so we can resolve real Django PKs
+  const fetchDjangoUsers = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/users/dropdown/`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setDjangoUsers(Array.isArray(data) ? data : (data.results || []));
+    } catch (err) {
+      console.error('Error fetching Django users:', err);
     }
   };
 
@@ -290,17 +325,32 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
     inactive: branches.filter(b => b.status === 'inactive').length,
   };
 
-  // ── Helper: find the synced Django User ID for a Misel shop ──
-  // After sync, backend creates a user with username = "misel_<id>"
-  // We look up that user in the branches list (user_info) or fall back to shop.id
+  // ── Resolve the actual Django User PK for a given Misel shop ──
+  // Username convention mirrors the backend sync:
+  //   • client_id present  → "misel_{client_id}"   e.g. "misel_CLIENT001"
+  //   • client_id absent   → "misel_{id}"           e.g. "misel_1"  (fallback)
   const resolveUserId = (shop) => {
-    // Try to find a branch already linked to this misel shop by matching shop_name
-    const linked = branches.find(
-      b => b.user_info?.shop_name === shop.firm_name
+    const clientId = (shop.client_id || '').trim();
+    const expectedUsername = clientId
+      ? `misel_${clientId}`
+      : `misel_${shop.id}`;
+
+    // 1. Match by derived username — most reliable
+    const byUsername = djangoUsers.find(u => u.username === expectedUsername);
+    if (byUsername?.id) return byUsername.id;
+
+    // 2. Fallback: match by shop_name (business_name stored on User)
+    const byShopName = djangoUsers.find(
+      u => u.shop_name && u.shop_name === shop.firm_name
     );
+    if (byShopName?.id) return byShopName.id;
+
+    // 3. Already-linked branch
+    const linked = branches.find(b => b.user_info?.shop_name === shop.firm_name);
     if (linked?.user_info?.id) return linked.user_info.id;
-    // Fallback: use the Misel ID (sync must be run first for proper linking)
-    return shop.id;
+
+    // 4. Cannot resolve — return null so we show "sync needed" warning
+    return null;
   };
 
   return (
@@ -410,12 +460,16 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                               key={shop.id}
                               onMouseDown={() => {
                                 const resolvedUserId = resolveUserId(shop);
-                                // ── FIX 2 & 3: use firm_name for branch_name, correct user ID ──
+                                if (!resolvedUserId) {
+                                  alert(`Cannot find a Django user for "${shop.firm_name}". Please run Misel Sync first so the user is created in the system.`);
+                                  return;
+                                }
+                                // ── use firm_name for branch_name, correct user ID ──
                                 setFormData(prev => ({
                                   ...prev,
                                   user:        resolvedUserId,
-                                  branch_name: shop.address1 || shop.firm_name, // ✅ address1 is the branch name
-                                  branch_code: String(shop.id),
+                                  branch_name: shop.address1 || shop.firm_name,
+                                  branch_code: shop.client_id ? String(shop.client_id) : String(shop.id),
                                   location:    shop.address1 || '',
                                   address:     shop.address1 || '',
                                 }));
@@ -436,6 +490,9 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                             >
                               <span style={{ fontWeight: 600, fontSize: 13, color: '#1d2939' }}>
                                 🏪 {shop.firm_name}
+                                {!resolveUserId(shop) && (
+                                  <span style={{ color: '#f04438', fontSize: 11, marginLeft: 6 }}>⚠ sync needed</span>
+                                )}
                               </span>
                               {shop.address1 && (
                                 <span style={{ fontSize: 11, color: '#667085' }}>📍 {shop.address1}</span>

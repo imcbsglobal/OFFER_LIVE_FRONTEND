@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import './BranchOffersPage.scss';
+import vmartLogo from '../assets/VMART.jpg';
 
 const API_BASE = 'http://192.168.1.45:8000/api';
 
@@ -49,10 +50,25 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const ClockIcon = ({ size = 10 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12 6 12 12 16 14"/>
+  </svg>
+);
+
 // ── Helpers ───────────────────────────────────────────────────────────
 const formatDate = (d) => {
   if (!d) return '';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatTime = (t) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
 // ── Popup Modal ───────────────────────────────────────────────────────
@@ -61,7 +77,6 @@ function OfferModal({ offer, onClose }) {
   const [idx, setIdx] = useState(0);
   const scrollRef = useRef(null);
 
-  // Sync idx as user scrolls
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
     const el = scrollRef.current;
@@ -69,7 +84,6 @@ function OfferModal({ offer, onClose }) {
     setIdx(newIdx);
   }, []);
 
-  // Programmatic scroll
   const scrollTo = useCallback((i) => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTo({ top: i * scrollRef.current.clientHeight, behavior: 'smooth' });
@@ -87,6 +101,7 @@ function OfferModal({ offer, onClose }) {
   }, [idx, images.length, scrollTo, onClose]);
 
   const currentImage = images[idx] || null;
+  const hasHourly = offer.offer_start_time && offer.offer_end_time;
 
   const handleShare = async () => {
     if (navigator.share && currentImage) {
@@ -109,15 +124,11 @@ function OfferModal({ offer, onClose }) {
             ))}
           </div>
         )}
-        <button className="bop-modal-close" onClick={onClose}>✕</button>
+        <button className="bop-modal-close" onClick={onClose}>&#x2715;</button>
       </div>
 
-      {/* ── Continuous vertical snap scroller — images ONLY, zero gaps ── */}
-      <div
-        className="bop-modal-scroll-feed"
-        ref={scrollRef}
-        onScroll={handleScroll}
-      >
+      {/* ── Continuous vertical snap scroller ── */}
+      <div className="bop-modal-scroll-feed" ref={scrollRef} onScroll={handleScroll}>
         {images.length === 0 ? (
           <div className="bop-feed-slide">
             <div className="bop-feed-empty">No image available</div>
@@ -131,7 +142,7 @@ function OfferModal({ offer, onClose }) {
               )}
               {i === 0 && images.length > 1 && (
                 <div className="bop-swipe-hint">
-                  <span>↑</span> Swipe up for more
+                  <span>&#8593;</span> Swipe up for more
                 </div>
               )}
             </div>
@@ -139,15 +150,24 @@ function OfferModal({ offer, onClose }) {
         )}
       </div>
 
-      {/* ── Bottom panel: description + date + actions ── */}
+      {/* ── Bottom panel ── */}
       <div className="bop-modal-bottom-panel">
         {offer.description && (
           <p className="bop-bottom-desc">{offer.description}</p>
         )}
         <div className="bop-bottom-row">
-          <div className="bop-bottom-validity">
-            <CalendarIcon size={12} />
-            {formatDate(offer.valid_from)} · {formatDate(offer.valid_to)}
+          <div className="bop-bottom-validity-wrap">
+            <div className="bop-bottom-validity">
+              <CalendarIcon size={12} />
+              {formatDate(offer.valid_from)} &middot; {formatDate(offer.valid_to)}
+            </div>
+            {/* FIX 4: hourly time window in modal */}
+            {hasHourly && (
+              <div className="bop-bottom-hourly">
+                <ClockIcon size={11} />
+                {formatTime(offer.offer_start_time)} &ndash; {formatTime(offer.offer_end_time)}
+              </div>
+            )}
           </div>
           <div className="bop-bottom-actions">
             <button className="bop-btn-share" onClick={handleShare}>
@@ -198,101 +218,164 @@ function BranchOffersPage() {
   if (loading) return (
     <div className="bop-loading">
       <div className="bop-spinner" />
-      <p>Loading offers…</p>
+      <p>Loading offers&hellip;</p>
     </div>
   );
 
   if (error) return (
     <div className="bop-error">
-      <div className="bop-error-icon">⚠️</div>
+      <img src={vmartLogo} alt="VMART" className="bop-error-logo" />
+      <div className="bop-error-icon">&#9888;&#65039;</div>
       <p>{error}</p>
+      <small>Please check your connection and try again.</small>
     </div>
   );
 
   return (
     <div className="bop-page">
 
-      {/* ── Header ── */}
-      <header className="bop-header">
-        {branch?.shop_name && (
-          <div className="bop-shop-name">{branch.shop_name}</div>
-        )}
-        <h1 className="bop-branch-name">
-          {branch?.branch_name || 'Branch Offers'}
-        </h1>
-        <div className="bop-branch-meta">
-          {branch?.location       && <span><LocationIcon /> {branch.location}</span>}
-          {branch?.contact_number && <span><PhoneIcon /> {branch.contact_number}</span>}
-        </div>
-      </header>
+      {/* ── Header + pill — hidden when no offers ── */}
+      {offers.length > 0 && (
+        <>
+          <header className="bop-header">
+            <div className="bop-header-logo-wrap">
+              <img src={vmartLogo} alt="VMART" className="bop-header-logo" />
+            </div>
+            <div className="bop-header-text">
+              {branch?.shop_name && (
+                <div className="bop-shop-name">{branch.shop_name}</div>
+              )}
+              <h1 className="bop-branch-name">
+                {branch?.branch_name || 'Branch Offers'}
+              </h1>
+              <div className="bop-branch-meta">
+                {branch?.location       && <span><LocationIcon /> {branch.location}</span>}
+                {branch?.contact_number && <span><PhoneIcon /> {branch.contact_number}</span>}
+              </div>
+            </div>
+          </header>
 
-      {/* ── Section label ── */}
-      <div className="bop-section-title">
-        <h2>Flyer Offers</h2>
-        <div className="bop-offer-count">
-          {offers.length} {offers.length === 1 ? 'offer' : 'offers'} available
-        </div>
-      </div>
+          <div className="bop-offers-summary">
+            <span className="bop-offer-count">
+              {offers.length} {offers.length === 1 ? 'offer' : 'offers'} available
+            </span>
+          </div>
+        </>
+      )}
 
-      {/* ── Grid / Empty ── */}
+      {/* ── Grouped offer sections ── */}
       {offers.length === 0 ? (
         <div className="bop-empty">
-          <div className="bop-empty-icon">🎁</div>
-          <p>No active offers right now</p>
-          <small>Check back soon for exciting deals!</small>
+          <div className="bop-empty-logo-wrap">
+            <img src={vmartLogo} alt="VMART" className="bop-empty-logo" />
+          </div>
+          <div className="bop-empty-content">
+            <h3 className="bop-empty-title">No Offers Right Now</h3>
+            <p className="bop-empty-sub">We&apos;re working on something exciting.<br />Check back soon for great deals!</p>
+            <div className="bop-empty-divider"><span>&#10022;</span></div>
+            <p className="bop-empty-hint">New offers are added regularly.<br />Thank you for your patience.</p>
+          </div>
+          <div className="bop-empty-footer">
+            <p>&#10022; POWERED BY VSAVER &#10022;</p>
+          </div>
         </div>
       ) : (
-        <div className={`bop-grid ${offers.length === 1 ? 'single' : ''}`}>
-          {offers.map(offer => {
-            const images = offer.media_files?.filter(m => m.media_type === 'image') || [];
-            const thumb  = images[0];
+        Object.entries(
+          offers.reduce((groups, offer) => {
+            const key = (offer.title || '').trim();
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(offer);
+            return groups;
+          }, {})
+        ).map(([title, groupOffers]) => {
+          const totalImages = groupOffers.reduce((sum, o) =>
+            sum + (o.media_files?.filter(m => m.media_type === 'image').length || 0), 0
+          );
+          const validFrom = groupOffers.reduce((min, o) =>
+            (!min || o.valid_from < min) ? o.valid_from : min, null
+          );
+          const validTo = groupOffers.reduce((max, o) =>
+            (!max || o.valid_to > max) ? o.valid_to : max, null
+          );
 
-            return (
-              <div
-                className="bop-offer-card"
-                key={offer.id}
-                onClick={() => setSelected(offer)}
-              >
-                <div className="bop-card-thumb">
-                  {thumb ? (
-                    <img src={thumb.file_url} alt={offer.title} />
-                  ) : (
-                    <div style={{
-                      width: '100%', height: '100%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: '#ede8df', color: '#aaa', fontSize: 12
-                    }}>
-                      No Image
-                    </div>
+          return (
+            <div className="bop-offer-section" key={title}>
+              <div className="bop-section-title">
+                <h2>{title}</h2>
+                <div className="bop-section-meta">
+                  <span className="bop-validity-tag">
+                    <CalendarIcon size={11} />
+                    {formatDate(validFrom)} &ndash; {formatDate(validTo)}
+                  </span>
+                  {totalImages > 0 && (
+                    <span className="bop-img-tag">
+                      <ImagesIcon /> {totalImages} {totalImages === 1 ? 'image' : 'images'}
+                    </span>
                   )}
-                  <div className="bop-thumb-validity">
-                    <CalendarIcon />
-                    Until {formatDate(offer.valid_to)}
-                  </div>
-                  {images.length > 1 && (
-                    <div className="bop-img-count">
-                      <ImagesIcon /> {images.length}
-                    </div>
-                  )}
-                </div>
-                <div className="bop-card-footer">
-                  <div className="bop-card-title">{offer.title}</div>
-                  {offer.description && (
-                    <div className="bop-card-subdesc">{offer.description}</div>
+                  {groupOffers.length > 1 && (
+                    <span className="bop-img-tag">{groupOffers.length} offers</span>
                   )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              <div className={`bop-group-grid ${groupOffers.length === 1 ? 'bop-group-single' : ''}`}>
+                {groupOffers.map(offer => {
+                  const images = offer.media_files?.filter(m => m.media_type === 'image') || [];
+                  const thumb  = images[0];
+                  const hasHourly = offer.offer_start_time && offer.offer_end_time;
+
+                  return (
+                    <div
+                      className="bop-offer-card bop-offer-card--section"
+                      key={offer.id}
+                      onClick={() => setSelected(offer)}
+                    >
+                      <div className="bop-card-thumb">
+                        {thumb ? (
+                          <img src={thumb.file_url} alt={offer.title} />
+                        ) : (
+                          <div className="bop-thumb-placeholder">No Image</div>
+                        )}
+
+                        <div className="bop-thumb-validity">
+                          <CalendarIcon />
+                          Until {formatDate(offer.valid_to)}
+                        </div>
+
+                        {/* FIX 3: Hourly badge on card thumb */}
+                        {hasHourly && (
+                          <div className="bop-thumb-hourly">
+                            <ClockIcon size={9} />
+                            {formatTime(offer.offer_start_time)} &ndash; {formatTime(offer.offer_end_time)}
+                          </div>
+                        )}
+
+                        {images.length > 1 && (
+                          <div className="bop-img-count">
+                            <ImagesIcon /> {images.length}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* FIX 2 & 6: Always-present footer with CTA */}
+                      <div className="bop-card-footer">
+                        {offer.description && (
+                          <div className="bop-card-subdesc">{offer.description}</div>
+                        )}
+                        <div className="bop-card-cta">
+                          View Offer <span className="bop-cta-arrow">&#8594;</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })
       )}
 
-      {/* ── Footer ── */}
-      <div className="bop-footer">
-        <p>Powered by Vsaver</p>
-      </div>
-
-      {/* ── Popup Modal ── */}
+      {/* ── Modal ── */}
       {selected && (
         <OfferModal offer={selected} onClose={() => setSelected(null)} />
       )}

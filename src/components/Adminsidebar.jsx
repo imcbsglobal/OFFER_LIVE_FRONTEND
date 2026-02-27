@@ -8,7 +8,7 @@ const AdminSidebar = ({ isSidebarOpen, onToggleSidebar, onLogout, adminName = 'A
   const menuItems = [
     {
       id: 'user-management',
-      label: 'User Management',
+      label: 'Customer List',
       route: '/admin-dashboard',
       icon: (
         <svg viewBox="0 0 24 24" fill="currentColor">

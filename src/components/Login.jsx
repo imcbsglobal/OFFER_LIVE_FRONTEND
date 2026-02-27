@@ -2,33 +2,25 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../services/config";
 import { setAuthToken } from "../services/api";
+import vmartLogo from "../assets/VMART.jpg"; // ← put VMART.jpg in src/assets/
 import "./Login.scss";
 
 function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Admin state
-  const [adminForm, setAdminForm] = useState({ email: "", password: "" });
+  const [isAdmin, setIsAdmin]         = useState(false);
+  const [adminForm, setAdminForm]     = useState({ email: "", password: "", clientId: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone]             = useState("");
+  const [isLoading, setIsLoading]     = useState(false);
+  const [error, setError]             = useState("");
 
-  // User state
-  const [phone, setPhone] = useState("");
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // ─── Helpers ───────────────────────────────────────────────
-
+  // ─── Helpers ──────────────────────────────────────────────────────────────
   const safeParseResponse = async (response) => {
-    const contentType = response.headers.get("content-type") || "";
+    const ct   = response.headers.get("content-type") || "";
     const text = await response.text();
-    if (contentType.includes("application/json")) {
-      try {
-        return text ? JSON.parse(text) : {};
-      } catch {
-        return { error: "Invalid JSON response from server.", _raw: text };
-      }
+    if (ct.includes("application/json")) {
+      try { return text ? JSON.parse(text) : {}; }
+      catch { return { error: "Invalid JSON from server.", _raw: text }; }
     }
     return { error: "Non-JSON response from server.", _raw: text };
   };
@@ -37,32 +29,36 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
     setIsAdmin(toAdmin);
     setError("");
     setPhone("");
-    setAdminForm({ email: "", password: "" });
+    setAdminForm({ email: "", password: "", clientId: "" });
   };
 
-  // ─── Admin Login ──────────────────────────────────────────
-
+  // ─── Admin Login ──────────────────────────────────────────────────────────
   const handleAdminSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
     if (!adminForm.email || !adminForm.password) {
       setError("Please enter both email and password.");
       setIsLoading(false);
       return;
     }
-
+    if (!adminForm.clientId.trim()) {
+      setError("Please enter your Client ID.");
+      setIsLoading(false);
+      return;
+    }
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/login/`, {
+      const res  = await fetch(`${API_BASE_URL}/admin/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: adminForm.email, password: adminForm.password }),
+        body: JSON.stringify({
+          email:     adminForm.email,
+          password:  adminForm.password,
+          client_id: adminForm.clientId.trim(),
+        }),
       });
-
-      const data = await safeParseResponse(response);
-
-      if (response.ok && data.access && data.refresh) {
+      const data = await safeParseResponse(res);
+      if (res.ok && data.access && data.refresh) {
         localStorage.setItem("access_token", data.access);
         localStorage.setItem("refresh_token", data.refresh);
         setAuthToken(data.access);
@@ -72,224 +68,191 @@ function Login({ onAdminLogin = () => {}, onUserLogin = () => {} }) {
         navigate("/admin-dashboard");
         return;
       }
-
       setError(data?.error || "Login failed. Please check your credentials.");
-      if (data?._raw) console.error("Raw server response:", data._raw);
+      if (data?._raw) console.error("Raw:", data._raw);
     } catch (err) {
-      console.error("Admin login error:", err);
+      console.error(err);
       setError("Request failed. Check backend URL / CORS / server logs.");
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
-  // ─── User Login (phone → debtors API check) ───────────────
-
+  // ─── User Login ───────────────────────────────────────────────────────────
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
     const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length < 10) {
-      setError("Please enter a valid 10-digit mobile number.");
-      return;
-    }
-
+    if (cleaned.length < 10) { setError("Please enter a valid 10-digit mobile number."); return; }
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/user/login/`, {
+      const res  = await fetch(`${API_BASE_URL}/user/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone_number: cleaned }),
       });
-
-      const data = await safeParseResponse(response);
-
-      if (response.ok && data.access && data.refresh) {
+      const data = await safeParseResponse(res);
+      if (res.ok && data.access && data.refresh) {
         localStorage.setItem("access_token", data.access);
         localStorage.setItem("refresh_token", data.refresh);
         setAuthToken(data.access);
-        const userData = { 
-          ...data.user, 
-          is_admin: false,
-          debtor_name: data.debtor_name || '',
-          debtor_code: data.debtor_code || '',
-          place: data.place || '',
+        const userData = {
+          ...data.user, is_admin: false,
+          debtor_name: data.debtor_name || "",
+          debtor_code: data.debtor_code || "",
+          place:       data.place       || "",
         };
         localStorage.setItem("user", JSON.stringify(userData));
         onUserLogin(userData);
         navigate("/user-dashboard");
         return;
       }
-
-      setError((() => { const msg = data?.error || "Login failed. Please check your number."; if (msg.toLowerCase().includes("not registered")) return "This number isn't linked to any account. Please check and try again."; return msg.replace(/\.?\s*Please contact.*?(admin|us)\.?/gi, "").trim(); })());
-      if (data?._raw) console.error("Raw server response:", data._raw);
+      setError((() => {
+        const msg = data?.error || "Login failed. Please check your number.";
+        if (msg.toLowerCase().includes("not registered"))
+          return "This number isn't linked to any account. Please check and try again.";
+        return msg.replace(/\.?\s*Please contact.*?(admin|us)\.?/gi, "").trim();
+      })());
+      if (data?._raw) console.error("Raw:", data._raw);
     } catch (err) {
-      console.error("User login error:", err);
+      console.error(err);
       setError("Request failed. Check backend URL / CORS / server logs.");
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
-  // ─── Render ───────────────────────────────────────────────
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="login-container">
-      <div className="login-card">
+    <div className="login-page">
 
-        {/* Left panel */}
-        <div className="login-left">
-          <div className="logo-section">
-            <div className="logo-circles">
-              <div className="circle"></div>
-              <div className="circle"></div>
-              <div className="circle"></div>
-            </div>
-            <div className="welcome-text">
-              <h2>Welcome Back!</h2>
-              <p>Sign in to access your account and continue your journey with us.</p>
-            </div>
-          </div>
+      {/* ══════ LEFT — orange + logo ══════ */}
+      <div className="login-left">
+
+        {/* decorative blobs */}
+        <span className="blob blob-top"    />
+        <span className="blob blob-bottom" />
+
+        <div className="brand-card">
+          <img src={vmartLogo} alt="VMART" className="brand-logo" />
         </div>
+        <p className="brand-tagline">Your trusted partner in every journey.</p>
+      </div>
 
-        {/* Right panel */}
-        <div className="login-right">
-          <div className="login-header">
-            <h1>Sign In</h1>
-            <p>Enter your credentials to continue</p>
-          </div>
+      {/* ══════ RIGHT — white + form ══════ */}
+      <div className="login-right">
+        <div className="form-box">
 
-          {/* Tab toggle */}
-          <div className="login-type-toggle">
+          <h1 className="greeting">Welcome Back</h1>
+          <p  className="sub">Sign in to continue</p>
+
+          {/* Tabs */}
+          <div className="tabs">
             <button
               type="button"
-              className={!isAdmin ? "active" : ""}
+              className={`tab ${!isAdmin ? "tab--active" : ""}`}
               onClick={() => switchTab(false)}
-            >
-              User Login
-            </button>
+            >User Login</button>
             <button
               type="button"
-              className={isAdmin ? "active" : ""}
+              className={`tab ${isAdmin ? "tab--active" : ""}`}
               onClick={() => switchTab(true)}
-            >
-              Admin Login
-            </button>
+            >Admin Login</button>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="alert-message alert-error">
-              <span className="alert-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </span>
-              <span className="alert-text">{error}</span>
+            <div className="error-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8"  x2="12"    y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              {error}
             </div>
           )}
 
-          {/* ── ADMIN: email + password ── */}
+          {/* ── Admin ── */}
           {isAdmin && (
-            <form className="login-form" onSubmit={handleAdminSubmit}>
-              <div className="form-group">
-                <label htmlFor="email">Email Address</label>
-                <div className="input-wrapper">
-                  <span className="input-icon">👤</span>
-                  <input
-                    type="email"
-                    id="email"
-                    value={adminForm.email}
-                    onChange={(e) => { setAdminForm((p) => ({ ...p, email: e.target.value })); if (error) setError(""); }}
-                    placeholder="Enter your email"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
+            <form onSubmit={handleAdminSubmit}>
+              <div className="field">
+                <label htmlFor="adm-client">Client ID</label>
+                <input
+                  id="adm-client" type="text"
+                  value={adminForm.clientId}
+                  onChange={(e) => { setAdminForm(p => ({ ...p, clientId: e.target.value })); if (error) setError(""); }}
+                  placeholder="e.g. 111"
+                  required disabled={isLoading}
+                  autoComplete="off"
+                />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="password">Password</label>
-                <div className="input-wrapper">
-                  <span className="input-icon">🔒</span>
+              <div className="field">
+                <label htmlFor="adm-email">Email Address</label>
+                <input
+                  id="adm-email" type="email"
+                  value={adminForm.email}
+                  onChange={(e) => { setAdminForm(p => ({ ...p, email: e.target.value })); if (error) setError(""); }}
+                  placeholder="admin@example.com"
+                  required disabled={isLoading}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="adm-pw">Password</label>
+                <div className="pw-wrap">
                   <input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
+                    id="adm-pw" type={showPassword ? "text" : "password"}
                     value={adminForm.password}
-                    onChange={(e) => { setAdminForm((p) => ({ ...p, password: e.target.value })); if (error) setError(""); }}
-                    placeholder="Enter your password"
-                    required
-                    disabled={isLoading}
-                    style={{ paddingRight: "45px" }}
+                    onChange={(e) => { setAdminForm(p => ({ ...p, password: e.target.value })); if (error) setError(""); }}
+                    placeholder="••••••••"
+                    required disabled={isLoading}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="password-toggle"
-                    disabled={isLoading}
-                  >
+                  <button type="button" className="eye-btn" tabIndex={-1}
+                    onClick={() => setShowPassword(v => !v)} disabled={isLoading}>
                     {showPassword ? "👁️" : "👁️‍🗨️"}
                   </button>
                 </div>
               </div>
 
-              <div className="form-options">
-                <label className="remember-me">
-                  <input type="checkbox" />
-                  <span>Remember me</span>
-                </label>
-                {/* <a href="#" className="forgot-password">Forgot Password?</a> */}
-              </div>
+              <label className="remember">
+                <input type="checkbox" /> Remember me
+              </label>
 
               <button type="submit" className="login-btn" disabled={isLoading}>
-                {isLoading ? "Signing In..." : "Get Started"}
+                {isLoading ? "Signing in…" : "Log in"}
               </button>
             </form>
           )}
 
-          {/* ── USER: phone number only ── */}
+          {/* ── User ── */}
           {!isAdmin && (
-            <form className="login-form" onSubmit={handleUserSubmit}>
-              <div className="form-group">
-                <label htmlFor="phone">Mobile Number</label>
-                <div className="input-wrapper phone-input-wrapper">
-                  <span className="input-icon">📱</span>
-                  <span className="country-code">+91</span>
+            <form onSubmit={handleUserSubmit}>
+              <div className="field">
+                <label htmlFor="usr-phone">Mobile Number</label>
+                <div className="phone-wrap">
+                  <span className="dial">+91</span>
                   <input
-                    type="tel"
-                    id="phone"
+                    id="usr-phone" type="tel"
                     value={phone}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setPhone(val);
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPhone(v);
                       if (error) setError("");
                     }}
                     placeholder="Enter your mobile number"
-                    required
-                    disabled={isLoading}
-                    maxLength={10}
-                    inputMode="numeric"
+                    required disabled={isLoading}
+                    maxLength={10} inputMode="numeric"
                   />
                 </div>
-                <span className="field-hint">Enter the number registered with your account</span>
+                <span className="hint">Enter the number registered with your account</span>
               </div>
 
-              <button
-                type="submit"
-                className="login-btn"
-                disabled={isLoading || phone.replace(/\D/g, "").length < 10}
-              >
-                {isLoading ? "Verifying..." : "Login"}
+              <button type="submit" className="login-btn"
+                disabled={isLoading || phone.replace(/\D/g, "").length < 10}>
+                {isLoading ? "Verifying…" : "Log in"}
               </button>
             </form>
           )}
 
-          <div className="login-footer">
-            {/* <p>Don't have an account? <a href="#">Contact Admin</a></p> */}
-          </div>
         </div>
       </div>
     </div>

@@ -936,6 +936,13 @@ select.om-input { cursor: pointer; }
     color: #974f0c;
     &::before { background: #d04f00; }
   }
+
+  // Hourly offer whose time window has ended today
+  &.om-status-expired {
+    background: #f4f5f7;
+    color: #5e6c84;
+    &::before { background: #97a0af; }
+  }
 }
 
 // ── Row actions ───────────────────────────────────────────────────────────────
@@ -1532,4 +1539,186 @@ select.om-input { cursor: pointer; }
   .om-qr-modal   { max-width: 100%; border-radius: 10px 10px 0 0; max-height: 88vh; }
   .om-qr-grid    { grid-template-columns: 1fr 1fr; gap: 10px; }
   .om-qr-img-wrap img { width: 120px; height: 120px; }
+}
+
+// ── Hourly Offer Toggle ───────────────────────────────────────────────────────
+.om-hourly-toggle-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.om-hourly-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.om-toggle-switch {
+  width: 42px;
+  height: 24px;
+  background: #dfe1e6;
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+
+  &.om-toggle-on {
+    background: #0052cc;
+  }
+}
+
+.om-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(9,30,66,0.25);
+
+  .om-toggle-on & {
+    transform: translateX(18px);
+  }
+}
+
+.om-hourly-toggle-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+  gap: 2px;
+}
+
+.om-hourly-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #5e6c84;
+}
+
+// ── Hourly Section (shown when toggle is on) ──────────────────────────────────
+.om-hourly-section {
+  background: #f0f5ff;
+  border: 1px solid #b3d4ff;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 4px;
+  animation: om-fade-in 0.18s ease;
+}
+
+@keyframes om-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.om-hourly-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.om-hourly-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.om-hourly-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0052cc;
+  margin: 0 0 2px 0;
+}
+
+.om-hourly-sub {
+  font-size: 12px;
+  color: #5e6c84;
+  margin: 0;
+}
+
+.om-time-preview {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #0052cc;
+  font-weight: 500;
+}
+
+.om-hourly-summary {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #e3f5e9;
+  border: 1px solid #b3dfbd;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #006644;
+}
+
+// ── Hourly pill in table ──────────────────────────────────────────────────────
+.om-hourly-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  color: #0052cc;
+  background: #deebff;
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-top: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+// ── Custom AM/PM Time Picker ──────────────────────────────────────────────────
+.om-time-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .om-time-select {
+    padding: 8px 10px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #1a1a2e;
+    background: #fff;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #0052cc;
+      box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.15);
+    }
+
+    &:disabled {
+      background: #f6f8fa;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  .om-time-ampm {
+    font-weight: 600;
+    color: #0052cc;
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    min-width: 64px;
+
+    &:focus {
+      border-color: #0052cc;
+    }
+  }
+
+  .om-time-colon {
+    font-size: 18px;
+    font-weight: 700;
+    color: #555;
+    line-height: 1;
+  }
 }

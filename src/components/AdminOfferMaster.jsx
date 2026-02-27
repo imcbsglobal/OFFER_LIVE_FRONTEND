@@ -20,7 +20,8 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
   const dropdownRef = useRef(null);
 
   const [formData, setFormData] = useState({
-    title: '', description: '', validFrom: '', validTo: '', status: 'active', files: []
+    title: '', description: '', validFrom: '', validTo: '', status: 'active', files: [],
+    offerStartTime: '', offerEndTime: '', isHourlyOffer: false
   });
   const [filePreviews, setFilePreviews]         = useState([]);
   const [isEditing, setIsEditing]               = useState(false);
@@ -205,8 +206,15 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
     if (!formData.title.trim())   { setError('Offer title is required'); return; }
     if (!formData.validFrom)      { setError('Valid From date is required'); return; }
     if (!formData.validTo)        { setError('Valid To date is required'); return; }
-    if (formData.validTo < formData.validFrom) { setError('Valid To must be after Valid From'); return; }
+    if (formData.validTo < formData.validFrom) { setError('Valid To must be on or after Valid From'); return; }
     if (!selectedBranches.length) { setError('Please select at least one branch'); return; }
+
+    // Hourly validation
+    if (formData.isHourlyOffer) {
+      if (!formData.offerStartTime) { setError('Please set the offer start time'); return; }
+      if (!formData.offerEndTime)   { setError('Please set the offer end time'); return; }
+      if (formData.offerEndTime <= formData.offerStartTime) { setError('End time must be after start time'); return; }
+    }
 
     setLoading(true); setError(null); setSuccessMessage(null);
     try {
@@ -216,6 +224,14 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
       fd.append('valid_from',  formData.validFrom);
       fd.append('valid_to',    formData.validTo);
       fd.append('status',      formData.status);
+      // Hourly offer fields
+      if (formData.isHourlyOffer && formData.offerStartTime) {
+        fd.append('offer_start_time', formData.offerStartTime);
+        fd.append('offer_end_time',   formData.offerEndTime);
+      } else {
+        fd.append('offer_start_time', '');
+        fd.append('offer_end_time',   '');
+      }
       selectedBranches.forEach(id => fd.append('branch_ids', id));
       formData.files.forEach(f => fd.append('files', f));
 
@@ -234,7 +250,7 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
       }
 
       setSuccessMessage(isEditing ? 'Offer updated!' : 'Offer created!');
-      setFormData({ title:'', description:'', validFrom:'', validTo:'', status:'active', files:[] });
+      setFormData({ title:'', description:'', validFrom:'', validTo:'', status:'active', files:[], offerStartTime:'', offerEndTime:'', isHourlyOffer:false });
       setFilePreviews([]);
       setSelectedBranches([]);
       setIsEditing(false);
@@ -249,13 +265,17 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
   };
 
   const handleEdit = (offer) => {
+    const hasHourly = !!(offer.offer_start_time || offer.offer_end_time);
     setFormData({
-      title:       offer.title,
-      description: offer.description || '',
-      validFrom:   offer.valid_from,
-      validTo:     offer.valid_to,
-      status:      offer.status,
-      files:       []
+      title:          offer.title,
+      description:    offer.description || '',
+      validFrom:      offer.valid_from,
+      validTo:        offer.valid_to,
+      status:         offer.status,
+      files:          [],
+      offerStartTime: offer.offer_start_time || '',
+      offerEndTime:   offer.offer_end_time   || '',
+      isHourlyOffer:  hasHourly,
     });
     setFilePreviews([]);
     setSelectedBranches(offer.branches?.map(b => b.id) || []);
@@ -265,7 +285,7 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
   };
 
   const handleCancel = () => {
-    setFormData({ title:'', description:'', validFrom:'', validTo:'', status:'active', files:[] });
+    setFormData({ title:'', description:'', validFrom:'', validTo:'', status:'active', files:[], offerStartTime:'', offerEndTime:'', isHourlyOffer:false });
     setFilePreviews([]);
     setSelectedBranches([]);
     setIsEditing(false);
@@ -346,6 +366,30 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
   const paginatedOffers = filteredOffers.slice((currentPage-1)*ROWS_PER_PAGE, currentPage*ROWS_PER_PAGE);
 
   const handleTableSearch = (e) => { setTableSearch(e.target.value); setCurrentPage(1); };
+
+  // ── 12-hour time helpers ──────────────────────────────────────────────────
+  // Convert "HH:MM" (24h) → { hour, minute, ampm }
+  const to12h = (val) => {
+    if (!val) return { hour: '12', minute: '00', ampm: 'AM' };
+    const [h, m] = val.split(':').map(Number);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const hour = h % 12 === 0 ? '12' : String(h % 12).padStart(2, '0');
+    return { hour, minute: String(m).padStart(2, '0'), ampm };
+  };
+
+  // Convert { hour, minute, ampm } → "HH:MM" (24h)
+  const to24h = ({ hour, minute, ampm }) => {
+    let h = parseInt(hour, 10);
+    if (ampm === 'AM' && h === 12) h = 0;
+    if (ampm === 'PM' && h !== 12) h += 12;
+    return `${String(h).padStart(2, '0')}:${minute}`;
+  };
+
+  const handleTimePart = (field, part, val) => {
+    const current = to12h(formData[field]);
+    const updated = { ...current, [part]: val };
+    setFormData(p => ({ ...p, [field]: to24h(updated) }));
+  };
 
   const formatDate = (ds) => {
     if (!ds) return 'N/A';
@@ -463,13 +507,152 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
               <div className="om-grid-2">
                 <div className="om-field">
                   <label className="om-label">Valid From <span className="om-req">*</span></label>
-                  <input className="om-input" type="date" name="validFrom" value={formData.validFrom} onChange={handleInputChange} disabled={loading} />
+                  <input
+                    className="om-input"
+                    type="date"
+                    name="validFrom"
+                    value={formData.validFrom}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                  />
                 </div>
                 <div className="om-field">
                   <label className="om-label">Valid To <span className="om-req">*</span></label>
-                  <input className="om-input" type="date" name="validTo" value={formData.validTo} onChange={handleInputChange} disabled={loading} />
+                  <input
+                    className="om-input"
+                    type="date"
+                    name="validTo"
+                    value={formData.validTo}
+                    min={formData.validFrom || undefined}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                  />
                 </div>
               </div>
+
+              {/* ── Hourly Offer Toggle ── */}
+              <div className="om-hourly-toggle-row">
+                <label className="om-hourly-toggle-label">
+                  <div
+                    className={`om-toggle-switch ${formData.isHourlyOffer ? 'om-toggle-on' : ''}`}
+                    onClick={() => !loading && setFormData(p => ({
+                      ...p,
+                      isHourlyOffer: !p.isHourlyOffer,
+                      offerStartTime: '',
+                      offerEndTime: ''
+                    }))}
+                  >
+                    <div className="om-toggle-knob" />
+                  </div>
+                  <span className="om-hourly-toggle-text">
+                    ⏰ Hourly Offer
+                    <span className="om-hourly-hint">Restrict this offer to specific hours of the day</span>
+                  </span>
+                </label>
+              </div>
+
+              {/* ── Hourly Time Pickers (shown only when toggle is on) ── */}
+              {formData.isHourlyOffer && (
+                <div className="om-hourly-section">
+                  <div className="om-hourly-header">
+                    <span className="om-hourly-icon">🕐</span>
+                    <div>
+                      <p className="om-hourly-title">Set Offer Time Window</p>
+                      <p className="om-hourly-sub">Offer will only be visible to customers within this time range</p>
+                    </div>
+                  </div>
+                  <div className="om-grid-2">
+                    <div className="om-field">
+                      <label className="om-label">Offer Start Time <span className="om-req">*</span></label>
+                      <div className="om-time-picker">
+                        <select
+                          className="om-time-select"
+                          value={to12h(formData.offerStartTime).hour}
+                          onChange={e => handleTimePart('offerStartTime', 'hour', e.target.value)}
+                          disabled={loading}
+                        >
+                          {['12','01','02','03','04','05','06','07','08','09','10','11'].map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="om-time-colon">:</span>
+                        <select
+                          className="om-time-select"
+                          value={to12h(formData.offerStartTime).minute}
+                          onChange={e => handleTimePart('offerStartTime', 'minute', e.target.value)}
+                          disabled={loading}
+                        >
+                          {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="om-time-select om-time-ampm"
+                          value={to12h(formData.offerStartTime).ampm}
+                          onChange={e => handleTimePart('offerStartTime', 'ampm', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
+                      {formData.offerStartTime && (
+                        <small className="om-time-preview">
+                          {new Date('1970-01-01T' + formData.offerStartTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </small>
+                      )}
+                    </div>
+                    <div className="om-field">
+                      <label className="om-label">Offer End Time <span className="om-req">*</span></label>
+                      <div className="om-time-picker">
+                        <select
+                          className="om-time-select"
+                          value={to12h(formData.offerEndTime).hour}
+                          onChange={e => handleTimePart('offerEndTime', 'hour', e.target.value)}
+                          disabled={loading}
+                        >
+                          {['12','01','02','03','04','05','06','07','08','09','10','11'].map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span className="om-time-colon">:</span>
+                        <select
+                          className="om-time-select"
+                          value={to12h(formData.offerEndTime).minute}
+                          onChange={e => handleTimePart('offerEndTime', 'minute', e.target.value)}
+                          disabled={loading}
+                        >
+                          {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          className="om-time-select om-time-ampm"
+                          value={to12h(formData.offerEndTime).ampm}
+                          onChange={e => handleTimePart('offerEndTime', 'ampm', e.target.value)}
+                          disabled={loading}
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
+                      {formData.offerEndTime && (
+                        <small className="om-time-preview">
+                          {new Date('1970-01-01T' + formData.offerEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </small>
+                      )}
+                    </div>
+                  </div>
+                  {formData.offerStartTime && formData.offerEndTime && formData.offerEndTime > formData.offerStartTime && (
+                    <div className="om-hourly-summary">
+                      ✅ Offer active from{' '}
+                      <strong>{new Date('1970-01-01T' + formData.offerStartTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</strong>
+                      {' '}to{' '}
+                      <strong>{new Date('1970-01-01T' + formData.offerEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Description */}
               <div className="om-field">
@@ -751,6 +934,13 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                               <span className="om-date-from">{formatDate(offer.valid_from)}</span>
                               <span className="om-date-sep">→</span>
                               <span className="om-date-to">{formatDate(offer.valid_to)}</span>
+                              {offer.offer_start_time && offer.offer_end_time && (
+                                <span className="om-hourly-pill">
+                                  ⏰ {new Date('1970-01-01T' + offer.offer_start_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                  {' – '}
+                                  {new Date('1970-01-01T' + offer.offer_end_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -788,7 +978,21 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
 
                           {/* Status */}
                           <td>
-                            <span className={`om-status-pill om-status-${offer.status}`}>{offer.status}</span>
+                            {/* Use computed_status for real-time display */}
+                            {(() => {
+                              const cs = offer.computed_status || offer.status;
+                              const labels = {
+                                active:    '● Active',
+                                inactive:  '● Inactive',
+                                scheduled: '⏳ Scheduled',
+                                expired:   '⌛ Expired',
+                              };
+                              return (
+                                <span className={`om-status-pill om-status-${cs}`}>
+                                  {labels[cs] || cs}
+                                </span>
+                              );
+                            })()}
                           </td>
 
                           {/* Actions */}
