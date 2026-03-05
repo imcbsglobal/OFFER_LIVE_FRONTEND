@@ -257,6 +257,11 @@ $radius-lg: 8px;
 }
 
 // ─────────────────────────────────────────────────────────
+// MOBILE-ONLY TABLE CONTROLS (hidden on desktop)
+// ─────────────────────────────────────────────────────────
+.table-controls--mobile { display: none; }
+
+// ─────────────────────────────────────────────────────────
 // TABLE SECTION
 // ─────────────────────────────────────────────────────────
 .table-section {
@@ -733,7 +738,50 @@ $radius-lg: 8px;
 
 @media (max-width: 768px) {
   .page-header .header-left .page-title { font-size: 20px; }
-  .stats-container { grid-template-columns: 1fr; }
+
+  // Hide search + Add User from the top header
+  .header-actions { display: none !important; }
+
+  // Show mobile controls (between stats & table)
+  .table-controls--mobile {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+
+    .search-wrapper {
+      flex: 1;
+      .search-input { width: 100%; }
+    }
+
+    .add-user-btn { flex-shrink: 0; }
+  }
+
+  // Stats: compact horizontal 3-column row
+  .stats-container {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+
+    .stat-card {
+      padding: 8px 6px 8px 12px;
+      gap: 6px;
+
+      &::before { width: 3px; }
+
+      .stat-icon {
+        width: 30px;
+        height: 30px;
+        flex-shrink: 0;
+        svg { width: 14px; height: 14px; }
+      }
+
+      .stat-content {
+        .stat-value { font-size: 16px; margin-bottom: 1px; }
+        .stat-label { font-size: 8px; letter-spacing: 0.2px; }
+      }
+    }
+  }
 
   // ── Mobile table: hide PHONE & ACTIONS headers, stack content ──
   .table-container {

@@ -420,19 +420,38 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
           {/* ── Stats ── */}
           <div className="om-stats-grid">
             <div className="om-stat-card">
-              <div className="om-stat-icon om-icon-blue">🎁</div>
+              <div className="om-stat-icon om-icon-blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/>
+                  <rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+              </div>
               <div><div className="om-stat-num">{stats.total}</div><div className="om-stat-lbl">Total Offers</div></div>
             </div>
             <div className="om-stat-card">
-              <div className="om-stat-icon om-icon-green">✅</div>
+              <div className="om-stat-icon om-icon-green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
               <div><div className="om-stat-num">{stats.active}</div><div className="om-stat-lbl">Active</div></div>
             </div>
             <div className="om-stat-card">
-              <div className="om-stat-icon om-icon-yellow">🕐</div>
+              <div className="om-stat-icon om-icon-yellow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
               <div><div className="om-stat-num">{stats.scheduled}</div><div className="om-stat-lbl">Scheduled</div></div>
             </div>
             <div className="om-stat-card">
-              <div className="om-stat-icon om-icon-red">⛔</div>
+              <div className="om-stat-icon om-icon-red">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+              </div>
               <div><div className="om-stat-num">{stats.inactive}</div><div className="om-stat-lbl">Inactive</div></div>
             </div>
           </div>
@@ -462,7 +481,12 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
           <div className="om-form-card">
             <div className="om-card-header">
               <div className="om-card-header-left">
-                <div className="om-card-header-icon">{isEditing ? '✏️' : '➕'}</div>
+                <div className="om-card-header-icon">
+                  {isEditing
+                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  }
+                </div>
                 <div>
                   <h2 className="om-card-title">{isEditing ? 'Edit Offer' : 'Create New Offer'}</h2>
                   <p className="om-card-sub">
@@ -545,7 +569,8 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                     <div className="om-toggle-knob" />
                   </div>
                   <span className="om-hourly-toggle-text">
-                    ⏰ Hourly Offer
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'16px',height:'16px',display:'inline-block',verticalAlign:'middle',marginRight:'6px'}}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Hourly Offer
                     <span className="om-hourly-hint">Restrict this offer to specific hours of the day</span>
                   </span>
                 </label>
@@ -555,7 +580,9 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
               {formData.isHourlyOffer && (
                 <div className="om-hourly-section">
                   <div className="om-hourly-header">
-                    <span className="om-hourly-icon">🕐</span>
+                    <span className="om-hourly-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </span>
                     <div>
                       <p className="om-hourly-title">Set Offer Time Window</p>
                       <p className="om-hourly-sub">Offer will only be visible to customers within this time range</p>
@@ -645,7 +672,8 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                   </div>
                   {formData.offerStartTime && formData.offerEndTime && formData.offerEndTime > formData.offerStartTime && (
                     <div className="om-hourly-summary">
-                      ✅ Offer active from{' '}
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{width:'14px',height:'14px',display:'inline-block',verticalAlign:'middle',marginRight:'6px'}}><polyline points="20 6 9 17 4 12"/></svg>
+                      Offer active from{' '}
                       <strong>{new Date('1970-01-01T' + formData.offerStartTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</strong>
                       {' '}to{' '}
                       <strong>{new Date('1970-01-01T' + formData.offerEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</strong>
@@ -910,7 +938,9 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                             <div className="om-offer-cell">
                               {offer.media_files?.length > 0 && offer.media_files[0].media_type === 'image'
                                 ? <img className="om-thumb" src={offer.media_files[0].file_url} alt={offer.title}/>
-                                : <div className="om-thumb-placeholder">🎁</div>
+                                : <div className="om-thumb-placeholder">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                                  </div>
                               }
                               <span className="om-offer-name">{offer.title}</span>
                             </div>
@@ -936,7 +966,8 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                               <span className="om-date-to">{formatDate(offer.valid_to)}</span>
                               {offer.offer_start_time && offer.offer_end_time && (
                                 <span className="om-hourly-pill">
-                                  ⏰ {new Date('1970-01-01T' + offer.offer_start_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'12px',height:'12px',display:'inline-block',verticalAlign:'middle',marginRight:'3px'}}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                  {new Date('1970-01-01T' + offer.offer_start_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                   {' – '}
                                   {new Date('1970-01-01T' + offer.offer_end_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                 </span>
@@ -950,7 +981,10 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                               {offer.branches?.length > 0 ? (
                                 <>
                                   {offer.branches.slice(0, 2).map(b => (
-                                    <span key={b.id} className="om-branch-pill">🏪 {b.branch_name}</span>
+                                    <span key={b.id} className="om-branch-pill">
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'11px',height:'11px',display:'inline-block',verticalAlign:'middle',marginRight:'3px'}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                      {b.branch_name}
+                                    </span>
                                   ))}
                                   {offer.branches.length > 2 && (
                                     <span className="om-branch-pill om-pill-more">+{offer.branches.length - 2}</span>
@@ -971,7 +1005,8 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                                   files: offer.media_files || []
                                 })}
                               >
-                                📎 {offer.media_count} {offer.media_count === 1 ? 'file' : 'files'}
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'13px',height:'13px',display:'inline-block',verticalAlign:'middle',marginRight:'4px'}}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                {offer.media_count} {offer.media_count === 1 ? 'file' : 'files'}
                               </button>
                             ) : <span className="om-muted">—</span>}
                           </td>
@@ -1161,7 +1196,10 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                   {qrModal.branches.map(branch => (
                     <div key={branch.id} className="om-qr-card">
                       <div className="om-qr-card-header">
-                        <span className="om-qr-branch-name">🏪 {branch.branch_name}</span>
+                        <span className="om-qr-branch-name">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'13px',height:'13px',display:'inline-block',verticalAlign:'middle',marginRight:'4px'}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                          {branch.branch_name}
+                        </span>
                         <span className="om-qr-branch-code">{branch.branch_code}</span>
                       </div>
                       {branch.qr_code_url ? (
@@ -1169,11 +1207,15 @@ const AdminOfferMaster = ({ onLogout, userData }) => {
                           <div className="om-qr-img-wrap">
                             <img src={branch.qr_code_url} alt={`QR for ${branch.branch_name}`} />
                           </div>
-                          <p className="om-qr-hint">📱 Customers scan to view offers</p>
+                          <p className="om-qr-hint">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'13px',height:'13px',display:'inline-block',verticalAlign:'middle',marginRight:'4px'}}><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                            Customers scan to view offers
+                          </p>
                           <div className="om-qr-card-actions">
                             {branch.branch_offers_url && (
                               <a className="om-qr-preview-link" href={branch.branch_offers_url} target="_blank" rel="noopener noreferrer">
-                                🔗 Preview
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'13px',height:'13px',display:'inline-block',verticalAlign:'middle',marginRight:'4px'}}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                Preview
                               </a>
                             )}
                             <button className="om-qr-print-btn" onClick={() => handlePrintQR(branch)}>

@@ -57,7 +57,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
         });
 
         // 2. Fetch latest Misel shops
-        const miselRes = await fetch('https://vsaverapi.imcbs.com/api/misel/');
+        const miselRes = await fetch(`${API_BASE_URL}/misel/`, { headers: getHeaders() });
         if (!miselRes.ok) return;
         const miselData = await miselRes.json();
         const shops = Array.isArray(miselData) ? miselData : (miselData.results || []);
@@ -148,7 +148,8 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
   const fetchMiselShops = async () => {
     setMiselLoading(true);
     try {
-      const response = await fetch('https://vsaverapi.imcbs.com/api/misel/');
+      const response = await fetch(`${API_BASE_URL}/misel/`, { headers: getHeaders() });
+
       if (!response.ok) { console.error('Failed to fetch Misel shops'); return; }
       const data = await response.json();
       setMiselShops(Array.isArray(data) ? data : (data.results || []));
@@ -376,15 +377,30 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
           {/* Stats Strip */}
           <div className="stats-strip">
             <div className="stat-card">
-              <div className="stat-icon blue">🏢</div>
+              <div className="stat-icon blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </div>
               <div><div className="stat-num">{stats.total}</div><div className="stat-lbl">Total Branches</div></div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon green">✅</div>
+              <div className="stat-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+              </div>
               <div><div className="stat-num">{stats.active}</div><div className="stat-lbl">Active</div></div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon red">⛔</div>
+              <div className="stat-icon red">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+              </div>
               <div><div className="stat-num">{stats.inactive}</div><div className="stat-lbl">Inactive</div></div>
             </div>
           </div>
@@ -410,7 +426,7 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
           {/* Form Card */}
           <div className="form-card">
             <div className="card-header">
-              <h2>{isEditing ? '✏️ Edit Branch' : '➕ Add New Branch'}</h2>
+              <h2>{isEditing ? 'Edit Branch' : 'Add New Branch'}</h2>
               {isEditing && (
                 <button className="btn-cancel-header" onClick={handleCancel} disabled={loading}>
                   ✕ Cancel Edit
@@ -632,7 +648,12 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                             <div className="branch-cell">
                               {branch.branch_image_url
                                 ? <img className="branch-thumb" src={branch.branch_image_url} alt={branch.branch_name}/>
-                                : <div className="branch-thumb-placeholder">🏢</div>
+                                : <div className="branch-thumb-placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                      <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                  </div>
                               }
                               <div>
                                 <div className="branch-cell-name">{branch.branch_name}</div>
@@ -644,7 +665,12 @@ const AdminBranchMaster = ({ onLogout, userData }) => {
                           <td>
                             {branch.user_info && (
                               <span className="shop-owner-pill">
-                                🏪 {branch.user_info.shop_name || branch.user_info.username}
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:'12px',height:'12px',marginRight:'4px'}}>
+                                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                                  <line x1="3" y1="6" x2="21" y2="6"/>
+                                  <path d="M16 10a4 4 0 0 1-8 0"/>
+                                </svg>
+                                {branch.user_info.shop_name || branch.user_info.username}
                               </span>
                             )}
                           </td>

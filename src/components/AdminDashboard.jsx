@@ -68,7 +68,10 @@ const resolveDisplayName = (user) => {
   return user.username || "—";
 };
 
-const DEBTOR_API = "https://vsaverapi.imcbs.com/api/debtors/";
+
+
+
+const DEBTOR_API = `${API_BASE_URL}/debtors/`;
 
 /* ════════════════════════════════════════════════════════════════ */
 const AdminDashboard = ({ onLogout, userData }) => {
@@ -321,6 +324,22 @@ const AdminDashboard = ({ onLogout, userData }) => {
                 <div className="stat-label">Disabled</div>
               </div>
             </div>
+          </div>
+
+          {/* ── Mobile-only: Search + Add User ── */}
+          <div className="table-controls--mobile">
+            <div className="search-wrapper">
+              <SearchIcon />
+              <input
+                className="search-input"
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button className="add-user-btn" onClick={() => setShowAddForm(true)}>
+              <PlusIcon /> Add User
+            </button>
           </div>
 
           {/* ── Table ── */}
